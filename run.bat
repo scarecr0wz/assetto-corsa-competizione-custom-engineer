@@ -1,11 +1,11 @@
 @echo off
 cd /d "%~dp0"
-echo === Race Engineer Bawel — ACC ===
+echo === ACC - Custom Race Engineer ===
 echo.
-echo  [1] Mode GUI (Desktop App)   ^<-- DIREKOMENDASIKAN
-echo  [2] Mode Console (terminal biasa)
+echo  [1] Mode GUI (Desktop App)   ^<-- Recommended
+echo  [2] Mode Console (Terminal)
 echo.
-set /p MODE="Pilih mode (1/2): "
+set /p MODE="Mode select (1/2): "
 
 REM Inject broadcasting.json with correct password
 powershell -Command "$path='C:\Users\USER\Documents\Assetto Corsa Competizione\Config\broadcasting.json'; $content=\"{\`n    \`\"updListenerPort\`\": 9000,\`n    \`\"connectionPassword\`\": \`\"asd\`\",\`n    \`\"commandPassword\`\": \`\"\`\"\`n}\"; [System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::Unicode); Write-Host 'broadcasting.json OK (port 9000, password asd)'"

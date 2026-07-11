@@ -1,13 +1,13 @@
 """
-Race Engineer Bawel - Desktop GUI
-Gunakan ini sebagai pengganti main.py untuk mode GUI.
+ACC Custom Race Engineer - Desktop GUI (Compact Widget Edition)
+Gunakan ini sebagai antarmuka desktop yang ringkas dan informatif.
     python gui_app.py
 """
 
 import sys
 import os
 
-# Insert src directory into sys.path to find core modules
+# Masukkan folder src ke path agar modul-modul core bisa di-import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 
 import threading
@@ -27,16 +27,15 @@ from llm_commentary import LlmBanterWorker
 from voice_input import PttListener
 
 
-# ─── Theme ───────────────────────────────────────────────────────────────────
+# ─── Theme & Colors ──────────────────────────────────────────────────────────
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
-C_BG        = "#0D0F14"
-C_PANEL     = "#13161D"
-C_CARD      = "#1A1E28"
-C_BORDER    = "#252A38"
+C_BG        = "#0A0B0E"
+C_PANEL     = "#101216"
+C_CARD      = "#161920"
+C_BORDER    = "#222630"
 C_ACCENT    = "#E8352A"
-C_ACCENT2   = "#F5A623"
 C_GREEN     = "#27D48A"
 C_BLUE      = "#3B8BEB"
 C_TEXT      = "#E8EAF0"
@@ -52,21 +51,12 @@ EVT_STATUS    = "status"
 EVT_PTT       = "ptt"
 
 
-def _fmt_laptime(ms: int) -> str:
-    if not ms:
-        return "-:--.---"
-    total_sec = ms / 1000.0
-    minutes = int(total_sec // 60)
-    seconds = total_sec - minutes * 60
-    return f"{minutes}:{seconds:06.3f}"
-
-
 class RaceEngineerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("🏎️  Race Engineer Bawel")
-        self.geometry("1100x720")
-        self.minsize(900, 600)
+        self.title("ACC Engineer")
+        self.geometry("440x590")
+        self.minsize(400, 520)
         self.configure(fg_color=C_BG)
         self.resizable(True, True)
 
@@ -85,8 +75,24 @@ class RaceEngineerApp(ctk.CTk):
 
     # ─── UI Construction ─────────────────────────────────────────────────────
     def _build_ui(self):
-        self._build_topbar()
+        # 1. Header & Status Bar
+        header = ctk.CTkFrame(self, fg_color=C_PANEL, corner_radius=8,
+                              border_width=1, border_color=C_BORDER)
+        header.pack(fill="x", padx=10, pady=(10, 5))
 
+        # Title
+        ctk.CTkLabel(header, text="🎙️ ACC ENGINEER",
+                     font=ctk.CTkFont("Segoe UI", 14, weight="bold"),
+                     text_color=C_ACCENT).pack(side="left", padx=10, pady=8)
+
+        # Connection indicators
+        self._ind_broadcast = self._status_indicator(header, "Broadcast")
+        self._ind_broadcast.pack(side="right", padx=(5, 10))
+
+        self._ind_local = self._status_indicator(header, "SharedMem")
+        self._ind_local.pack(side="right", padx=(5, 5))
+
+        # 2. Main Tabs
         self._tabview = ctk.CTkTabview(
             self, fg_color=C_PANEL,
             segmented_button_fg_color=C_CARD,
@@ -97,74 +103,108 @@ class RaceEngineerApp(ctk.CTk):
             text_color=C_TEXT,
             border_width=1, border_color=C_BORDER,
         )
-        self._tabview.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        self._tabview.add("🏁  Engineer's Log")
-        self._tabview.add("📊  Telemetry")
-        self._tabview.add("⚙️  Settings")
+        self._tabview.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self._tabview.add("🏁 HUD & Log")
+        self._tabview.add("⚙️ Config")
 
-        self._build_log_tab(self._tabview.tab("🏁  Engineer's Log"))
-        self._build_telemetry_tab(self._tabview.tab("📊  Telemetry"))
-        self._build_settings_tab(self._tabview.tab("⚙️  Settings"))
+        self._build_main_tab(self._tabview.tab("🏁 HUD & Log"))
+        self._build_settings_tab(self._tabview.tab("⚙️ Config"))
 
-    def _build_topbar(self):
-        bar = ctk.CTkFrame(self, fg_color=C_PANEL, corner_radius=10,
-                           border_width=1, border_color=C_BORDER)
-        bar.pack(fill="x", padx=12, pady=(12, 6))
-
-        ctk.CTkLabel(bar, text="🏎️  Race Engineer Bawel",
-                     font=ctk.CTkFont("Segoe UI", 18, weight="bold"),
-                     text_color=C_ACCENT).pack(side="left", padx=16, pady=10)
-
-        right = ctk.CTkFrame(bar, fg_color="transparent")
-        right.pack(side="right", padx=16, pady=8)
-
-        self._lbl_session = ctk.CTkLabel(right, text="No Session",
-                                         font=ctk.CTkFont("Segoe UI", 12),
-                                         text_color=C_MUTED)
-        self._lbl_session.pack(side="right", padx=(16, 8))
-
-        self._ind_broadcast = self._status_indicator(right, "Broadcast API", C_MUTED)
-        self._ind_broadcast.pack(side="right", padx=(8, 0))
-
-        self._ind_local = self._status_indicator(right, "Shared Memory", C_MUTED)
-        self._ind_local.pack(side="right", padx=(8, 0))
-
-    def _status_indicator(self, parent, label: str, color: str) -> ctk.CTkFrame:
+    def _status_indicator(self, parent, label: str) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
-        dot = ctk.CTkLabel(frame, text="●", font=ctk.CTkFont("Segoe UI", 14),
-                           text_color=color)
+        dot = ctk.CTkLabel(frame, text="●", font=ctk.CTkFont("Segoe UI", 12),
+                           text_color=C_MUTED)
         dot.pack(side="left")
-        lbl = ctk.CTkLabel(frame, text=label, font=ctk.CTkFont("Segoe UI", 11),
+        lbl = ctk.CTkLabel(frame, text=label, font=ctk.CTkFont("Segoe UI", 10),
                            text_color=C_MUTED)
         lbl.pack(side="left", padx=(2, 0))
         frame._dot = dot
-        frame._lbl = lbl
         return frame
 
     def _set_indicator(self, indicator, connected: bool):
         indicator._dot.configure(text_color=C_GREEN if connected else C_MUTED)
 
-    # ─── Log Tab ─────────────────────────────────────────────────────────────
-    def _build_log_tab(self, parent):
+    # ─── Tab 1: HUD & Log ───────────────────────────────────────────────────
+    def _build_main_tab(self, parent):
         parent.configure(fg_color=C_PANEL)
-        parent.columnconfigure(0, weight=1)
-        parent.columnconfigure(1, weight=0)
-        parent.rowconfigure(0, weight=1)
 
+        # A. Mini Telemetry Panel (Tires + Key stats)
+        telemetry_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        telemetry_frame.pack(fill="x", padx=4, pady=4)
+
+        # Suhu Ban (Grid 2x2) - Sangat Ringkas
+        tyre_box = ctk.CTkFrame(telemetry_frame, fg_color=C_CARD, corner_radius=8,
+                                border_width=1, border_color=C_BORDER)
+        tyre_box.pack(side="left", fill="both", expand=True, padx=(0, 4))
+        
+        ctk.CTkLabel(tyre_box, text="TYRE TEMPS",
+                     font=ctk.CTkFont("Segoe UI", 9, weight="bold"),
+                     text_color=C_MUTED).pack(anchor="w", padx=8, pady=(4, 0))
+
+        tyre_grid = ctk.CTkFrame(tyre_box, fg_color="transparent")
+        tyre_grid.pack(expand=True, fill="both", padx=6, pady=4)
+        tyre_grid.columnconfigure(0, weight=1)
+        tyre_grid.columnconfigure(1, weight=1)
+        tyre_grid.rowconfigure(0, weight=1)
+        tyre_grid.rowconfigure(1, weight=1)
+
+        self._tyre_labels = {}
+        for name, r, c in [("FL", 0, 0), ("FR", 0, 1), ("RL", 1, 0), ("RR", 1, 1)]:
+            lbl = ctk.CTkLabel(tyre_grid, text="--°", font=ctk.CTkFont("Consolas", 14, weight="bold"),
+                               text_color=C_TEXT, fg_color=C_BORDER, corner_radius=4, height=28)
+            lbl.grid(row=r, column=c, padx=2, pady=2, sticky="nsew")
+            self._tyre_labels[name] = lbl
+
+        # Key Stats (Pos, Delta, Fuel)
+        stats_box = ctk.CTkFrame(telemetry_frame, fg_color=C_CARD, corner_radius=8,
+                                 border_width=1, border_color=C_BORDER, width=170)
+        stats_box.pack(side="right", fill="both", padx=(4, 0))
+        stats_box.pack_propagate(False)
+
+        # Pos
+        self._lbl_pos = ctk.CTkLabel(stats_box, text="P--",
+                                     font=ctk.CTkFont("Segoe UI", 18, weight="bold"),
+                                     text_color=C_ACCENT)
+        self._lbl_pos.pack(anchor="w", padx=10, pady=(6, 0))
+
+        # Delta
+        self._lbl_delta = ctk.CTkLabel(stats_box, text="Δ --s",
+                                       font=ctk.CTkFont("Consolas", 12),
+                                       text_color=C_MUTED)
+        self._lbl_delta.pack(anchor="w", padx=10)
+
+        # Fuel
+        self._lbl_fuel = ctk.CTkLabel(stats_box, text="Fuel: --",
+                                      font=ctk.CTkFont("Segoe UI", 11),
+                                      text_color=C_GREEN)
+        self._lbl_fuel.pack(anchor="w", padx=10, pady=(0, 6))
+
+        # B. Push-to-Talk Status Banner
+        self._ptt_banner = ctk.CTkFrame(parent, fg_color=C_BORDER, corner_radius=6)
+        self._ptt_banner.pack(fill="x", padx=4, pady=4)
+        
+        self._ptt_label = ctk.CTkLabel(
+            self._ptt_banner, text=f"🎙️ PTT READY ({config.PTT_KEY.upper()})",
+            font=ctk.CTkFont("Segoe UI", 10, weight="bold"),
+            text_color=C_MUTED,
+        )
+        self._ptt_label.pack(pady=4)
+
+        # C. Engineer's Log Box
         log_frame = ctk.CTkFrame(parent, fg_color=C_CARD, corner_radius=8,
                                  border_width=1, border_color=C_BORDER)
-        log_frame.grid(row=0, column=0, padx=(8, 4), pady=8, sticky="nsew")
+        log_frame.pack(fill="both", expand=True, padx=4, pady=(4, 2))
 
-        ctk.CTkLabel(log_frame, text="ENGINEER'S LOG",
-                     font=ctk.CTkFont("Segoe UI", 11, weight="bold"),
-                     text_color=C_MUTED).pack(anchor="w", padx=12, pady=(8, 0))
+        ctk.CTkLabel(log_frame, text="RADIO LOG",
+                     font=ctk.CTkFont("Segoe UI", 9, weight="bold"),
+                     text_color=C_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
 
         self._log_text = ctk.CTkTextbox(
             log_frame, fg_color=C_CARD, text_color=C_TEXT,
-            font=ctk.CTkFont("Consolas", 12),
+            font=ctk.CTkFont("Segoe UI", 11),
             activate_scrollbars=True, wrap="word", border_width=0,
         )
-        self._log_text.pack(fill="both", expand=True, padx=8, pady=(4, 8))
+        self._log_text.pack(fill="both", expand=True, padx=6, pady=(2, 6))
         self._log_text.configure(state="disabled")
         tb = self._log_text._textbox
         tb.tag_configure("urgent",    foreground=C_URGENT)
@@ -172,308 +212,60 @@ class RaceEngineerApp(ctk.CTk):
         tb.tag_configure("banter",    foreground=C_BANTER)
         tb.tag_configure("normal",    foreground=C_NORMAL)
         tb.tag_configure("timestamp", foreground=C_MUTED)
-        tb.tag_configure("system",    foreground="#4A9EFF")
+        tb.tag_configure("system",    foreground=C_BLUE)
 
-        # Sidebar
-        sidebar = ctk.CTkFrame(parent, fg_color=C_CARD, corner_radius=8,
-                               border_width=1, border_color=C_BORDER, width=160)
-        sidebar.grid(row=0, column=1, padx=(4, 8), pady=8, sticky="nsew")
-        sidebar.pack_propagate(False)
+        # Session Label Footer
+        self._lbl_session = ctk.CTkLabel(parent, text="Session info waiting...",
+                                         font=ctk.CTkFont("Segoe UI", 10),
+                                         text_color=C_MUTED)
+        self._lbl_session.pack(pady=2)
 
-        ctk.CTkLabel(sidebar, text="VOICE COMMAND",
-                     font=ctk.CTkFont("Segoe UI", 10, weight="bold"),
-                     text_color=C_MUTED).pack(pady=(12, 4))
-
-        self._mic_frame = ctk.CTkFrame(sidebar, fg_color=C_BORDER,
-                                       corner_radius=50, width=80, height=80)
-        self._mic_frame.pack(pady=8)
-        self._mic_frame.pack_propagate(False)
-        self._mic_label = ctk.CTkLabel(self._mic_frame, text="🎙️",
-                                       font=ctk.CTkFont("Segoe UI", 32))
-        self._mic_label.pack(expand=True)
-
-        self._ptt_status_label = ctk.CTkLabel(
-            sidebar, text="Hold CAPS LOCK\nto speak",
-            font=ctk.CTkFont("Segoe UI", 11),
-            text_color=C_MUTED, justify="center",
-        )
-        self._ptt_status_label.pack(pady=4)
-
-        ctk.CTkFrame(sidebar, fg_color=C_BORDER, height=1).pack(
-            fill="x", padx=12, pady=12)
-
-        ctk.CTkLabel(sidebar, text="PRIORITY LEGEND",
-                     font=ctk.CTkFont("Segoe UI", 10, weight="bold"),
-                     text_color=C_MUTED).pack(pady=(0, 6))
-
-        for color, label in [
-            (C_URGENT,  "🔴 Urgent"),
-            (C_WARNING, "🟡 Warning"),
-            (C_NORMAL,  "⚪ Normal"),
-            (C_BANTER,  "🔵 Banter"),
-        ]:
-            ctk.CTkLabel(sidebar, text=label,
-                         font=ctk.CTkFont("Segoe UI", 11),
-                         text_color=color).pack(anchor="w", padx=16, pady=1)
-
-    # ─── Telemetry Tab ────────────────────────────────────────────────────────
-    def _build_telemetry_tab(self, parent):
-        parent.configure(fg_color=C_PANEL)
-        for c in range(3):
-            parent.columnconfigure(c, weight=1)
-        for r in range(3):
-            parent.rowconfigure(r, weight=1)
-
-        # Tyre temps
-        tyre_card = self._make_card(parent, "🏎️  TYRE TEMPERATURES (°C)")
-        tyre_card.grid(row=0, column=0, columnspan=2, padx=(8, 4), pady=(8, 4), sticky="nsew")
-
-        tyre_inner = ctk.CTkFrame(tyre_card, fg_color="transparent")
-        tyre_inner.pack(fill="both", expand=True, padx=8, pady=8)
-        for c in range(2):
-            tyre_inner.columnconfigure(c, weight=1)
-        for r in range(2):
-            tyre_inner.rowconfigure(r, weight=1)
-
-        self._tyre_labels = {}
-        for name, r, c in [("FL", 0, 0), ("FR", 0, 1), ("RL", 1, 0), ("RR", 1, 1)]:
-            f = self._make_tyre_cell(tyre_inner, name)
-            f.grid(row=r, column=c, padx=4, pady=4, sticky="nsew")
-            self._tyre_labels[name] = f
-
-        # Fuel
-        fuel_card = self._make_card(parent, "⛽  FUEL")
-        fuel_card.grid(row=0, column=2, padx=(4, 8), pady=(8, 4), sticky="nsew")
-        self._fuel_value = ctk.CTkLabel(fuel_card, text="--",
-                                        font=ctk.CTkFont("Segoe UI", 36, weight="bold"),
-                                        text_color=C_GREEN)
-        self._fuel_value.pack(expand=True)
-        ctk.CTkLabel(fuel_card, text="laps remaining",
-                     font=ctk.CTkFont("Segoe UI", 12), text_color=C_MUTED).pack(pady=(0, 4))
-        self._fuel_liters_label = ctk.CTkLabel(fuel_card, text="-- L",
-                                               font=ctk.CTkFont("Segoe UI", 14),
-                                               text_color=C_TEXT)
-        self._fuel_liters_label.pack(pady=(0, 8))
-
-        # Lap times
-        lap_card = self._make_card(parent, "⏱  LAP TIMES")
-        lap_card.grid(row=1, column=0, columnspan=2, padx=(8, 4), pady=4, sticky="nsew")
-        lap_inner = ctk.CTkFrame(lap_card, fg_color="transparent")
-        lap_inner.pack(fill="both", expand=True, padx=12, pady=8)
-        lap_inner.columnconfigure(0, weight=1)
-        lap_inner.columnconfigure(1, weight=1)
-
-        ctk.CTkLabel(lap_inner, text="Last Lap", font=ctk.CTkFont("Segoe UI", 11),
-                     text_color=C_MUTED).grid(row=0, column=0, pady=(0, 2))
-        ctk.CTkLabel(lap_inner, text="Best Lap", font=ctk.CTkFont("Segoe UI", 11),
-                     text_color=C_MUTED).grid(row=0, column=1, pady=(0, 2))
-        self._last_lap_lbl = ctk.CTkLabel(lap_inner, text="-:--.---",
-                                          font=ctk.CTkFont("Consolas", 22, weight="bold"),
-                                          text_color=C_TEXT)
-        self._last_lap_lbl.grid(row=1, column=0)
-        self._best_lap_lbl = ctk.CTkLabel(lap_inner, text="-:--.---",
-                                          font=ctk.CTkFont("Consolas", 22, weight="bold"),
-                                          text_color=C_GREEN)
-        self._best_lap_lbl.grid(row=1, column=1)
-        self._delta_lbl = ctk.CTkLabel(lap_inner, text="Δ +0.000",
-                                       font=ctk.CTkFont("Consolas", 14),
-                                       text_color=C_MUTED)
-        self._delta_lbl.grid(row=2, column=0, columnspan=2, pady=4)
-
-        # Position
-        gap_card = self._make_card(parent, "🏁  POSITION & GAPS")
-        gap_card.grid(row=1, column=2, padx=(4, 8), pady=4, sticky="nsew")
-        self._pos_label = ctk.CTkLabel(gap_card, text="P--",
-                                       font=ctk.CTkFont("Segoe UI", 40, weight="bold"),
-                                       text_color=C_ACCENT)
-        self._pos_label.pack(pady=(8, 0))
-        self._gap_ahead_lbl = ctk.CTkLabel(gap_card, text="▲ ahead: --s",
-                                           font=ctk.CTkFont("Segoe UI", 12),
-                                           text_color=C_MUTED)
-        self._gap_ahead_lbl.pack()
-        self._gap_behind_lbl = ctk.CTkLabel(gap_card, text="▼ behind: --s",
-                                            font=ctk.CTkFont("Segoe UI", 12),
-                                            text_color=C_MUTED)
-        self._gap_behind_lbl.pack(pady=(0, 8))
-
-        # Car info
-        info_card = self._make_card(parent, "🚗  CAR / SESSION INFO")
-        info_card.grid(row=2, column=0, columnspan=3, padx=8, pady=(4, 8), sticky="nsew")
-        info_inner = ctk.CTkFrame(info_card, fg_color="transparent")
-        info_inner.pack(fill="both", expand=True, padx=12, pady=8)
-        for c in range(6):
-            info_inner.columnconfigure(c, weight=1)
-
-        self._info_labels = {}
-        for col, (display, key) in enumerate([
-            ("Track", "track"), ("Car", "car_model"), ("Session", "session"),
-            ("Driver", "driver_name"), ("Lap", "lap"), ("Speed", "speed"),
-        ]):
-            ctk.CTkLabel(info_inner, text=display, font=ctk.CTkFont("Segoe UI", 10),
-                         text_color=C_MUTED).grid(row=0, column=col, pady=(0, 2))
-            lbl = ctk.CTkLabel(info_inner, text="--",
-                               font=ctk.CTkFont("Segoe UI", 13, weight="bold"),
-                               text_color=C_TEXT)
-            lbl.grid(row=1, column=col)
-            self._info_labels[key] = lbl
-
-    def _make_card(self, parent, title: str) -> ctk.CTkFrame:
-        card = ctk.CTkFrame(parent, fg_color=C_CARD, corner_radius=8,
-                            border_width=1, border_color=C_BORDER)
-        ctk.CTkLabel(card, text=title, font=ctk.CTkFont("Segoe UI", 11, weight="bold"),
-                     text_color=C_MUTED).pack(anchor="w", padx=12, pady=(8, 2))
-        return card
-
-    def _make_tyre_cell(self, parent, pos: str) -> ctk.CTkFrame:
-        cell = ctk.CTkFrame(parent, fg_color=C_BORDER, corner_radius=8)
-        ctk.CTkLabel(cell, text=pos, font=ctk.CTkFont("Segoe UI", 11, weight="bold"),
-                     text_color=C_MUTED).pack(pady=(6, 0))
-        temp_lbl = ctk.CTkLabel(cell, text="--°",
-                                font=ctk.CTkFont("Consolas", 22, weight="bold"),
-                                text_color=C_TEXT)
-        temp_lbl.pack()
-        bar = ctk.CTkProgressBar(cell, height=6, progress_color=C_GREEN,
-                                 fg_color=C_CARD, corner_radius=3)
-        bar.set(0)
-        bar.pack(fill="x", padx=8, pady=(2, 8))
-        cell._temp_lbl = temp_lbl
-        cell._bar = bar
-        return cell
-
-    def _update_tyre_cell(self, cell, temp: float):
-        if temp <= 0:
-            cell._temp_lbl.configure(text="--°", text_color=C_MUTED)
-            cell._bar.set(0)
-            return
-        cell._temp_lbl.configure(text=f"{temp:.0f}°")
-        if temp < config.TYRE_TEMP_MIN_C:
-            color = C_BLUE
-        elif temp > config.TYRE_TEMP_MAX_C:
-            color = C_URGENT
-        else:
-            color = C_GREEN
-        cell._temp_lbl.configure(text_color=color)
-        cell._bar.configure(progress_color=color)
-        val = max(0.0, min(1.0, (temp - 20) / 110))
-        cell._bar.set(val)
-
-    # ─── Settings Tab ─────────────────────────────────────────────────────────
+    # ─── Tab 2: Settings ─────────────────────────────────────────────────────
     def _build_settings_tab(self, parent):
         parent.configure(fg_color=C_PANEL)
         scroll = ctk.CTkScrollableFrame(parent, fg_color=C_PANEL)
-        scroll.pack(fill="both", expand=True, padx=8, pady=8)
-        scroll.columnconfigure(0, weight=1)
-        scroll.columnconfigure(1, weight=1)
+        scroll.pack(fill="both", expand=True, padx=4, pady=4)
 
         # API Keys
-        api_card = self._make_card(scroll, "🔑  API KEYS")
-        api_card.grid(row=0, column=0, columnspan=2, padx=4, pady=4, sticky="ew")
-        self._groq_entry = self._labeled_entry(api_card, "Groq API Key",
-                                               config.GROQ_API_KEY or "",
-                                               placeholder="gsk_...", show="*")
-
-        # ACC Connection
-        acc_card = self._make_card(scroll, "🔌  ACC CONNECTION")
-        acc_card.grid(row=1, column=0, padx=4, pady=4, sticky="nsew")
-        self._broadcast_pw_entry = self._labeled_entry(acc_card, "Broadcast Password",
-                                                       config.ACC_CONNECTION_PASSWORD or "",
-                                                       show="*")
-        self._acc_host_entry = self._labeled_entry(acc_card, "Host", config.ACC_HOST)
-        self._acc_port_entry = self._labeled_entry(acc_card, "Port", str(config.ACC_PORT))
-
-        # Voice Settings
-        voice_card = self._make_card(scroll, "🔊  VOICE SETTINGS")
-        voice_card.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
-        self._voice_hint_entry = self._labeled_entry(voice_card, "TTS Voice Hint",
-                                                     config.TTS_VOICE_HINT or "",
-                                                     placeholder="e.g. en-GB-RyanNeural")
-        ctk.CTkLabel(voice_card, text="Speech Rate (wpm)",
-                     font=ctk.CTkFont("Segoe UI", 12),
-                     text_color=C_MUTED).pack(anchor="w", padx=12, pady=(8, 0))
-        self._rate_var = tk.IntVar(value=config.TTS_RATE)
-        rate_slider = ctk.CTkSlider(voice_card, from_=100, to=300, number_of_steps=40,
-                                    variable=self._rate_var,
-                                    button_color=C_ACCENT, button_hover_color="#C42A20",
-                                    progress_color=C_ACCENT)
-        rate_slider.pack(fill="x", padx=12, pady=(4, 0))
-        self._rate_display = ctk.CTkLabel(voice_card, text=f"{config.TTS_RATE} wpm",
-                                          font=ctk.CTkFont("Segoe UI", 11),
-                                          text_color=C_TEXT)
-        self._rate_display.pack(anchor="w", padx=12, pady=(0, 8))
-        rate_slider.configure(command=lambda v: self._rate_display.configure(
-            text=f"{int(v)} wpm"))
-
-        # Personality
-        pers_card = self._make_card(scroll, "🎭  PERSONALITY")
-        pers_card.grid(row=2, column=0, padx=4, pady=4, sticky="nsew")
-        ctk.CTkLabel(pers_card, text="Engineer Personality",
-                     font=ctk.CTkFont("Segoe UI", 12),
-                     text_color=C_MUTED).pack(anchor="w", padx=12, pady=(8, 2))
+        self._groq_entry = self._labeled_entry(scroll, "Groq API Key", config.GROQ_API_KEY or "", show="*")
+        
+        # PTT & Personality
+        self._ptt_entry = self._labeled_entry(scroll, "Push-to-Talk Key", config.PTT_KEY)
+        
+        ctk.CTkLabel(scroll, text="Engineer Personality", font=ctk.CTkFont("Segoe UI", 11),
+                     text_color=C_MUTED).pack(anchor="w", padx=12, pady=(6, 0))
         self._personality_var = tk.StringVar(value=config.ENGINEER_PERSONALITY)
-        ctk.CTkOptionMenu(pers_card,
-                          values=["galak", "santai", "cerewet_lucu"],
-                          variable=self._personality_var,
-                          fg_color=C_BORDER, button_color=C_ACCENT,
-                          button_hover_color="#C42A20",
-                          text_color=C_TEXT).pack(fill="x", padx=12, pady=(0, 12))
+        ctk.CTkOptionMenu(scroll, values=["galak", "santai", "cerewet_lucu"],
+                          variable=self._personality_var, fg_color=C_BORDER, button_color=C_ACCENT,
+                          button_hover_color="#C42A20", text_color=C_TEXT).pack(fill="x", padx=12, pady=(2, 6))
 
-        # Controls
-        ptt_card = self._make_card(scroll, "⌨️  CONTROLS")
-        ptt_card.grid(row=2, column=1, padx=4, pady=4, sticky="nsew")
-        self._ptt_entry = self._labeled_entry(ptt_card, "Push-to-Talk Key",
-                                              config.PTT_KEY,
-                                              placeholder="e.g. caps_lock")
+        # ACC Port / Pw
+        self._broadcast_pw_entry = self._labeled_entry(scroll, "Broadcast Password", config.ACC_CONNECTION_PASSWORD or "", show="*")
 
-        # LLM
-        llm_card = self._make_card(scroll, "🤖  LLM BANTER")
-        llm_card.grid(row=3, column=0, columnspan=2, padx=4, pady=4, sticky="ew")
-        self._enable_llm_var = tk.BooleanVar(value=config.ENABLE_LLM_BANTER)
-        ctk.CTkSwitch(llm_card, text="Enable LLM Banter",
-                      variable=self._enable_llm_var,
-                      onvalue=True, offvalue=False,
-                      progress_color=C_ACCENT,
-                      font=ctk.CTkFont("Segoe UI", 12),
-                      text_color=C_TEXT).pack(anchor="w", padx=12, pady=8)
-        self._llm_model_entry = self._labeled_entry(llm_card, "LLM Model", config.LLM_MODEL)
-
-        # Save
-        ctk.CTkButton(scroll, text="💾  Save & Apply Settings",
-                      command=self._save_settings,
+        # Save Button
+        ctk.CTkButton(scroll, text="💾 Save Settings", command=self._save_settings,
                       fg_color=C_ACCENT, hover_color="#C42A20",
-                      font=ctk.CTkFont("Segoe UI", 13, weight="bold"),
-                      height=40, corner_radius=8).grid(
-            row=4, column=0, columnspan=2, padx=4, pady=12, sticky="ew")
+                      font=ctk.CTkFont("Segoe UI", 12, weight="bold"),
+                      height=32, corner_radius=6).pack(fill="x", padx=12, pady=12)
 
-    def _labeled_entry(self, parent, label: str, value: str,
-                       placeholder: str = "", show: str = "") -> ctk.CTkEntry:
-        ctk.CTkLabel(parent, text=label, font=ctk.CTkFont("Segoe UI", 12),
-                     text_color=C_MUTED).pack(anchor="w", padx=12, pady=(8, 0))
-        entry = ctk.CTkEntry(parent, placeholder_text=placeholder or label,
-                             fg_color=C_BORDER, text_color=C_TEXT,
-                             border_color=C_BORDER, show=show)
+    def _labeled_entry(self, parent, label: str, value: str, show: str = "") -> ctk.CTkEntry:
+        ctk.CTkLabel(parent, text=label, font=ctk.CTkFont("Segoe UI", 11),
+                     text_color=C_MUTED).pack(anchor="w", padx=12, pady=(6, 0))
+        entry = ctk.CTkEntry(parent, fg_color=C_BORDER, text_color=C_TEXT,
+                             border_color=C_BORDER, show=show, height=28)
         if value:
             entry.insert(0, value)
-        entry.pack(fill="x", padx=12, pady=(2, 0))
+        entry.pack(fill="x", padx=12, pady=(2, 6))
         return entry
 
     def _save_settings(self):
         config.GROQ_API_KEY = self._groq_entry.get()
-        config.ACC_CONNECTION_PASSWORD = self._broadcast_pw_entry.get()
-        config.ACC_HOST = self._acc_host_entry.get()
-        try:
-            config.ACC_PORT = int(self._acc_port_entry.get())
-        except ValueError:
-            pass
-        config.TTS_VOICE_HINT = self._voice_hint_entry.get()
-        config.TTS_RATE = self._rate_var.get()
-        config.ENGINEER_PERSONALITY = self._personality_var.get()
         config.PTT_KEY = self._ptt_entry.get()
-        config.ENABLE_LLM_BANTER = self._enable_llm_var.get()
-        config.LLM_MODEL = self._llm_model_entry.get()
-        self._post_log("⚙️ Settings applied. Restart required for some changes.",
-                       priority=1, tag="system")
+        config.ENGINEER_PERSONALITY = self._personality_var.get()
+        config.ACC_CONNECTION_PASSWORD = self._broadcast_pw_entry.get()
+        self._post_log("⚙️ Settings saved. Restart recommended.", priority=1, tag="system")
 
-    # ─── Log helpers ──────────────────────────────────────────────────────────
+    # ─── Log & Update Helpers ────────────────────────────────────────────────
     def _post_log(self, text: str, priority: int = 1, tag: str = ""):
         self._ui_queue.put({"type": EVT_LOG, "text": text,
                             "priority": priority, "tag": tag})
@@ -492,7 +284,7 @@ class RaceEngineerApp(ctk.CTk):
         self._log_text.configure(state="disabled")
         self._log_text.see("end")
 
-    # ─── UI queue polling ─────────────────────────────────────────────────────
+    # ─── Queue Polling ───────────────────────────────────────────────────────
     def _poll_ui_queue(self):
         try:
             while True:
@@ -512,66 +304,59 @@ class RaceEngineerApp(ctk.CTk):
             self._set_indicator(self._ind_broadcast, evt.get("broadcast", False))
             si = evt.get("session_info", "")
             if si:
-                self._lbl_session.configure(text=si, text_color=C_TEXT)
+                self._lbl_session.configure(text=si)
         elif etype == EVT_TELEMETRY:
             self._update_telemetry_display(evt.get("state", {}))
         elif etype == EVT_PTT:
             active = evt.get("active", False)
-            self._mic_frame.configure(fg_color=C_ACCENT if active else C_BORDER)
-            self._ptt_status_label.configure(
-                text="🎙️ Listening..." if active else "Hold CAPS LOCK\nto speak",
-                text_color=C_URGENT if active else C_MUTED,
+            self._ptt_banner.configure(fg_color=C_ACCENT if active else C_BORDER)
+            self._ptt_label.configure(
+                text="🔴 MIC RECORDING..." if active else f"🎙️ PTT READY ({config.PTT_KEY.upper()})",
+                text_color=C_NORMAL if active else C_MUTED
             )
 
     def _update_telemetry_display(self, s: dict):
         if not s:
             return
-        for pos, key in [("FL","tyre_fl"),("FR","tyre_fr"),
-                          ("RL","tyre_rl"),("RR","tyre_rr")]:
-            self._update_tyre_cell(self._tyre_labels[pos], s.get(key, 0))
+        
+        # 1. Update tyre cells
+        for pos in ["FL", "FR", "RL", "RR"]:
+            temp = s.get(f"tyre_{pos.lower()}", 0)
+            cell = self._tyre_labels[pos]
+            if temp <= 0:
+                cell.configure(text="--°", fg_color=C_BORDER)
+            else:
+                cell.configure(text=f"{pos}: {temp:.0f}°")
+                if temp < config.TYRE_TEMP_MIN_C:
+                    cell.configure(fg_color=C_BLUE)
+                elif temp > config.TYRE_TEMP_MAX_C:
+                    cell.configure(fg_color=C_URGENT)
+                else:
+                    cell.configure(fg_color=C_GREEN)
+
+        # 2. Update stats
+        pos = s.get("position", 0)
+        self._lbl_pos.configure(text=f"Pos: P{pos}" if pos else "Pos: P--")
+        
+        delta = s.get("delta", 0)
+        self._lbl_delta.configure(
+            text=f"Delta: {delta:+.3f}s",
+            text_color=C_GREEN if delta < 0 else C_WARNING
+        )
 
         fl = s.get("fuel_laps", 0)
         liters = s.get("fuel_liters", 0)
-        fuel_color = (C_URGENT  if fl < config.FUEL_LAPS_CRITICAL else
-                      C_WARNING if fl < config.FUEL_LAPS_WARNING  else C_GREEN)
-        self._fuel_value.configure(text=f"{fl:.1f}", text_color=fuel_color)
-        self._fuel_liters_label.configure(text=f"{liters:.1f} L")
+        self._lbl_fuel.configure(
+            text=f"Fuel: {liters:.1f}L ({fl:.1f} laps)",
+            text_color=C_URGENT if fl < config.FUEL_LAPS_CRITICAL else (C_WARNING if fl < config.FUEL_LAPS_WARNING else C_GREEN)
+        )
 
-        self._last_lap_lbl.configure(text=s.get("last_lap", "-:--.---"))
-        self._best_lap_lbl.configure(text=s.get("best_lap", "-:--.---"))
-        delta = s.get("delta", 0)
-        self._delta_lbl.configure(
-            text=f"Δ {delta:+.3f}s",
-            text_color=C_GREEN if delta < 0 else C_WARNING)
-
-        pos = s.get("position", 0)
-        self._pos_label.configure(text=f"P{pos}" if pos else "P--")
-        ga = s.get("gap_ahead")
-        gb = s.get("gap_behind")
-        self._gap_ahead_lbl.configure(
-            text=f"▲ ahead: {ga:.1f}s" if ga else "▲ ahead: --")
-        self._gap_behind_lbl.configure(
-            text=f"▼ behind: {gb:.1f}s" if gb else "▼ behind: --")
-
-        speed = s.get("speed", 0)
-        lap_num = s.get("lap", 0)
-        for key, val in [
-            ("track",       s.get("track", "--")),
-            ("car_model",   s.get("car_model", "--")),
-            ("session",     s.get("session", "--")),
-            ("driver_name", s.get("driver_name", "--")),
-            ("lap",         str(lap_num) if lap_num else "--"),
-            ("speed",       f"{speed:.0f} km/h" if speed else "--"),
-        ]:
-            self._info_labels[key].configure(text=str(val)[:20])
-
-    # ─── Backend ──────────────────────────────────────────────────────────────
+    # ─── Backend Thread ──────────────────────────────────────────────────────
     def _start_backend(self):
-        self._post_log("🏎️  Race Engineer Bawel starting up...", priority=1, tag="system")
+        self._post_log("ACC Custom Engineer starting...", priority=1, tag="system")
 
         self._voice = VoiceQueue()
         self._voice.start()
-        self._post_log("✅ Voice queue ready.", priority=1, tag="system")
 
         _orig_say = self._voice.say
 
@@ -593,19 +378,32 @@ class RaceEngineerApp(ctk.CTk):
 
         self._ptt = PttListener(on_audio_ready=self._banter.handle_voice_command)
         self._ptt.start()
-        self._post_log(f"🎙️ Push-to-Talk ready ({config.PTT_KEY})", priority=1, tag="system")
+
+        # Update PTT listener to send GUI events
+        orig_on_press = self._ptt._on_press
+        orig_on_release = self._ptt._on_release
+
+        def new_on_press(key):
+            if self._ptt._is_ptt_key(key) and not self._ptt._recording:
+                self._ui_queue.put({"type": EVT_PTT, "active": True})
+            orig_on_press(key)
+
+        def new_on_release(key):
+            if self._ptt._is_ptt_key(key) and self._ptt._recording:
+                self._ui_queue.put({"type": EVT_PTT, "active": False})
+            orig_on_release(key)
+
+        self._ptt._on_press = new_on_press
+        self._ptt._on_release = new_on_release
 
         def telemetry_loop():
             local_reader = LocalTelemetryReader()
             broadcast    = BroadcastReader()
             rules        = RulesEngine()
 
-            self._post_log("Connecting to ACC Broadcasting API...", priority=1, tag="system")
+            self._post_log("Connecting to Broadcasting API...", priority=1, tag="system")
             ok = broadcast.connect(timeout_sec=5.0)
-            self._post_log(
-                "✅ Broadcasting API connected." if ok
-                else "⚠️ Broadcasting API not available — will retry every 30s.",
-                priority=1, tag="system")
+            self._post_log("Broadcasting connected." if ok else "Broadcasting offline (will retry).", priority=1, tag="system")
 
             last_broadcast_retry = time.time()
             player_identified    = False
@@ -621,10 +419,8 @@ class RaceEngineerApp(ctk.CTk):
                         if not bcast_connected and time.time() - last_broadcast_retry > 30:
                             last_broadcast_retry = time.time()
                             if broadcast.connect(timeout_sec=5.0):
-                                self._post_log("✅ Broadcasting API reconnected.",
-                                               priority=1, tag="system")
-                    self._ui_queue.put({"type": EVT_STATUS,
-                                        "local": False, "broadcast": bcast_connected})
+                                self._post_log("Broadcasting reconnected.", priority=1, tag="system")
+                    self._ui_queue.put({"type": EVT_STATUS, "local": False, "broadcast": bcast_connected})
                     time.sleep(config.POLL_INTERVAL_SEC)
                     continue
 
@@ -672,17 +468,16 @@ class RaceEngineerApp(ctk.CTk):
                     "engine_map":         snap.engine_map,
                     "brake_bias":         snap.brake_bias,
                     "session_time_left":  snap.session_time_left,
-                    # Pit fuel math
-                    "fuel_per_lap": snap.fuel_per_lap,
+                    "fuel_per_lap":       snap.fuel_per_lap,
                     "laps_remaining_estimate": snap.session_time_left / snap.last_lap_ms if snap.last_lap_ms and snap.last_lap_ms > 0 else 0,
-                    "fuel_to_end": ((snap.session_time_left / snap.last_lap_ms + 1.5) * snap.fuel_per_lap) if (snap.last_lap_ms and snap.last_lap_ms > 0 and snap.fuel_per_lap > 0) else 0,
+                    "fuel_to_end":        ((snap.session_time_left / snap.last_lap_ms + 1.5) * snap.fuel_per_lap) if (snap.last_lap_ms and snap.last_lap_ms > 0 and snap.fuel_per_lap > 0) else 0,
                     "fuel_to_add_at_pit": max(0, ((snap.session_time_left / snap.last_lap_ms + 1.5) * snap.fuel_per_lap) - snap.fuel_liters) if (snap.last_lap_ms and snap.last_lap_ms > 0 and snap.fuel_per_lap > 0) else 0,
-                    "pit_window_start": snap.pit_window_start,
-                    "pit_window_end": snap.pit_window_end,
-                    "penalty": snap.penalty_type,
-                    "track_grip": snap.track_grip_status,
-                    "air_temp": snap.air_temp,
-                    "road_temp": snap.road_temp,
+                    "pit_window_start":   snap.pit_window_start,
+                    "pit_window_end":     snap.pit_window_end,
+                    "penalty":            snap.penalty_type,
+                    "track_grip":         snap.track_grip_status,
+                    "air_temp":           snap.air_temp,
+                    "road_temp":          snap.road_temp,
                 })
 
                 msgs: list[Message] = rules.evaluate(local=snap)
@@ -707,10 +502,11 @@ class RaceEngineerApp(ctk.CTk):
                     "type": EVT_TELEMETRY,
                     "state": dict(last_state),
                 })
+                
                 session_info = ""
                 if snap.track:
-                    session_info = (f"{snap.track}  |  {snap.session_type}"
-                                    f"  |  P{snap.position}")
+                    session_info = f"{snap.track} | {snap.session_type} | Lap {snap.completed_laps}"
+                
                 self._ui_queue.put({
                     "type": EVT_STATUS,
                     "local": True,
@@ -724,10 +520,8 @@ class RaceEngineerApp(ctk.CTk):
             broadcast.close()
             local_reader.close()
 
-        self._telemetry_thread = threading.Thread(
-            target=telemetry_loop, daemon=True, name="TelemetryLoop")
+        self._telemetry_thread = threading.Thread(target=telemetry_loop, daemon=True, name="TelemetryLoop")
         self._telemetry_thread.start()
-        self._post_log("✅ Telemetry thread started.", priority=1, tag="system")
 
     def _on_close(self):
         self._stop_event.set()
