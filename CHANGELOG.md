@@ -25,6 +25,8 @@ This update focuses on making the engineer bi-directional (giving you control ba
 *   **Clean Repository Layout**: Created a `.gitignore` to skip compilation caches, compiled ZIP binaries, and test audio waves. Added an open-source MIT `LICENSE` file.
 
 ### Changed
+*   **Compact GUI Redesign (`gui_app.py`)**: Rebuilt the user interface into a mini-widget format (`440x590`). Consolidated tyre temps (using a 2x2 color-coded grid), position, delta, and fuel stats onto the main tab alongside the live speech log. Added visual PTT recording state animations.
+*   **Universal Launch Script (`run.bat`)**: Standardized Python executable execution paths and streamlined launching commands.
 *   **Directory Restructuring**: Tucked all internal Python modules (`config`, `telemetry`, `rules_engine`, etc.) inside a neat `src/` subfolder to clean up the root repository.
 *   **Path Resolvers**: Modified `main.py` and `gui_app.py` launcher paths using dynamic `sys.path` injection so no internal module import lines had to be rewritten.
 *   **Name Injection Registry**: Switched name-injection loops to rely on the active tracked driver registry (`self._current_driver_surname`) instead of raw static telemetry (which frequently got stuck using the profile owner's name after a driver swap).
